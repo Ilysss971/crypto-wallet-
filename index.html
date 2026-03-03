@@ -693,6 +693,7 @@ document.getElementById("btn-confirm").addEventListener("click",()=>{
   if(!state.txs[a.id])state.txs[a.id]=[];
   state.txs[a.id].push({id:rndId(),type:modalMode==="receive"?"receive":"send",addr,usd,crypto,px,time:nowTime(),hash:rndId()+rndId()});
   save();closeModal();render();
+  playPaymentSound(modalMode);
   toast(modalMode==="receive"?`+${fmtC(crypto,a.decimals)} ${a.symbol} reçu`:`−${fmtC(crypto,a.decimals)} ${a.symbol} envoyé`);
 });
 
@@ -720,6 +721,39 @@ function openDetail(tx,a){
 document.getElementById("btn-detail-close").addEventListener("click",()=>overlayDetail.style.display="none");
 document.getElementById("btn-detail-close2").addEventListener("click",()=>overlayDetail.style.display="none");
 overlayDetail.addEventListener("click",e=>{if(e.target===overlayDetail)overlayDetail.style.display="none"});
+
+// ── SOUND ──
+function playPaymentSound(type){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    if(type==="receive"){
+      // Son Apple Pay style — deux notes montantes douces
+      const times=[[0,.06,660,.18],[.13,.06,880,.22]];
+      times.forEach(([start,dur,freq,vol])=>{
+        const o=ctx.createOscillator();
+        const g=ctx.createGain();
+        o.connect(g);g.connect(ctx.destination);
+        o.type="sine";o.frequency.setValueAtTime(freq,ctx.currentTime+start);
+        g.gain.setValueAtTime(0,ctx.currentTime+start);
+        g.gain.linearRampToValueAtTime(vol,ctx.currentTime+start+0.01);
+        g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+start+dur+0.12);
+        o.start(ctx.currentTime+start);
+        o.stop(ctx.currentTime+start+dur+0.15);
+      });
+    }else{
+      // Son envoi — note unique descendante
+      const o=ctx.createOscillator();
+      const g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.type="sine";
+      o.frequency.setValueAtTime(520,ctx.currentTime);
+      o.frequency.linearRampToValueAtTime(380,ctx.currentTime+0.18);
+      g.gain.setValueAtTime(0.18,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.22);
+      o.start(ctx.currentTime);o.stop(ctx.currentTime+0.25);
+    }
+  }catch(e){}
+}
 
 // ── EXPORT PDF ──
 document.getElementById("btn-export-pdf").addEventListener("click",()=>{
