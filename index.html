@@ -108,6 +108,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .logout-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:4px 6px;border-radius:5px;font-family:'DM Sans',sans-serif;transition:color .15s}
 .logout-btn:hover{color:var(--text)}
 .sync-badge{font-size:11px;font-family:'DM Mono',monospace;margin-top:8px;display:block}
+.wallet-switcher{padding:10px 10px 0;border-bottom:1px solid var(--border);margin-bottom:4px}
+.wallet-switcher-label{font-size:10px;font-weight:600;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;padding:0 2px 6px;display:block}
+.wallet-switch-btn{display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 10px;border-radius:8px;border:1px solid transparent;background:none;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;margin-bottom:4px;transition:background .12s,color .12s,border-color .12s;text-align:left}
+.wallet-switch-btn:hover{background:var(--surface2);color:var(--text)}
+.wallet-switch-btn.active{background:var(--surface2);border-color:var(--border2);color:var(--text)}
+.wsb-left{display:flex;align-items:center;gap:8px}
+.wsb-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0}
+.wsb-dot.w2{background:var(--sol)}
+.wsb-name{font-size:12px;font-weight:600}
+.wsb-bal{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:1px}
 @media(max-width:700px){.sidebar{display:none}}
 
 /* MAIN */
@@ -287,6 +297,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="sidebar-logo">
         <div class="logo-mark">🔐</div>
         <span>CryptoSecure</span>
+      </div>
+      <div class="wallet-switcher">
+        <span class="wallet-switcher-label">Portefeuilles</span>
+        <button class="wallet-switch-btn active" id="wsb1" onclick="switchWallet(1)">
+          <div class="wsb-left"><div class="wsb-dot"></div><div><div class="wsb-name">Wallet #1</div><div class="wsb-bal" id="wsb1-bal">$3,275,000</div></div></div>
+        </button>
+        <button class="wallet-switch-btn" id="wsb2" onclick="switchWallet(2)">
+          <div class="wsb-left"><div class="wsb-dot w2"></div><div><div class="wsb-name">Wallet #2</div><div class="wsb-bal" id="wsb2-bal">$10,052,000.59</div></div></div>
+        </button>
       </div>
       <nav class="sidebar-nav">
         <div class="nav-label">Portfolio</div>
@@ -506,7 +525,9 @@ const ASSETS=[
 let prices={BTC:68000,ETH:3200,SOL:135};
 let activeId="btc";
 let qrInst=null;
-const SK="csw_v7";
+const SK1="csw_v7";
+const SK2="csw_v8_w2";
+let activeWallet=1;
 
 function rndId(){return Math.random().toString(16).slice(2)+Math.random().toString(16).slice(2)}
 function fmtUSD(n){const x=Number(n);if(!isFinite(x))return"$—";return"$"+x.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -518,11 +539,15 @@ function getPx(sym){return Number(prices[sym])||ASSETS.find(a=>a.symbol===sym)?.
 function shortHash(h){const s=String(h||"");return s.slice(0,14)+"…"+s.slice(-6)}
 
 // ── STATE ──
-function defaultState(){
-  return{version:7,balances:{
-    btc:clamp(1300000/getPx("BTC"),8),
-    eth:clamp(975000/getPx("ETH"),6),
-    sol:clamp(1000000/getPx("SOL"),4)
+function defaultState(w=1){
+  const isW2=w===2;
+  const btcUSD=isW2?4200000.59:1300000;
+  const ethUSD=isW2?3200000:975000;
+  const solUSD=isW2?2652000:1000000;
+  return{version:isW2?8:7,balances:{
+    btc:clamp(btcUSD/getPx("BTC"),8),
+    eth:clamp(ethUSD/getPx("ETH"),6),
+    sol:clamp(solUSD/getPx("SOL"),4)
   },txs:{
     btc:[
       {id:rndId(),type:"receive",addr:"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",usd:520000,crypto:7.647,px:68000,time:"18/02/2026 09:47:33",hash:"a3f4b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3"},
@@ -548,14 +573,31 @@ function defaultState(){
 let state;
 let _syncBlocked=false;
 
-function loadState(){
-  try{const raw=localStorage.getItem(SK);if(raw){const p=JSON.parse(raw);if(p.version===7)return p;}}catch(e){}
-  return defaultState();
+function getSK(){return activeWallet===2?SK2:SK1;}
+function loadState(w=1){
+  try{const raw=localStorage.getItem(w===2?SK2:SK1);if(raw){const p=JSON.parse(raw);if(p.version===(w===2?8:7))return p;}}catch(e){}
+  return defaultState(w);
 }
 function save(){
-  try{localStorage.setItem(SK,JSON.stringify(state))}catch(e){}
-  // Firebase sync
-  if(window._fbSave) window._fbSave(state);
+  try{localStorage.setItem(getSK(),JSON.stringify(state))}catch(e){}
+  if(window._fbSave) window._fbSave({[`wallet${activeWallet}`]:state});
+  updateWalletBadges();
+}
+function updateWalletBadges(){
+  const s1=loadState(1),s2=loadState(2);
+  let t1=0,t2=0;
+  ASSETS.forEach(a=>{t1+=Number(s1.balances[a.id]||0)*getPx(a.symbol);t2+=Number(s2.balances[a.id]||0)*getPx(a.symbol);});
+  document.getElementById("wsb1-bal").textContent=fmtUSD(t1);
+  document.getElementById("wsb2-bal").textContent=fmtUSD(t2);
+}
+function switchWallet(w){
+  activeWallet=w;
+  state=loadState(w);
+  activeId="btc";
+  document.getElementById("wsb1").classList.toggle("active",w===1);
+  document.getElementById("wsb2").classList.toggle("active",w===2);
+  document.querySelectorAll(".nav-item").forEach((el,i)=>el.classList.toggle("active",i===0));
+  render();
 }
 
 // ── TOAST ──
@@ -875,7 +917,7 @@ async function initSync(){
 
 // ── INIT ──
 async function init(){
-  state=loadState();
+  state=loadState(1);updateWalletBadges();
   render();
   refreshPrices();
   setInterval(refreshPrices,30000);
