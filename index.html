@@ -264,6 +264,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .fade-in{animation:fadeIn .25s ease both}
+
+/* ─ MOBILE NAV BAR ─ */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:50;padding:0 0 env(safe-area-inset-bottom) 0}
+.mobile-nav-inner{display:flex;align-items:stretch}
+.mn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 12px;gap:4px;cursor:pointer;border:none;background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;transition:color .15s;position:relative}
+.mn-item.active{color:var(--blue)}
+.mn-item.w2-active{color:var(--sol)}
+.mn-icon{font-size:18px;line-height:1}
+.mn-label{font-size:10px;white-space:nowrap}
+.mn-sep{width:1px;background:var(--border);margin:10px 0}
+.mn-badge{position:absolute;top:6px;right:calc(50% - 18px);background:var(--blue);color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;font-family:'DM Mono',monospace}
+@media(max-width:700px){
+  .mobile-nav{display:block}
+  .main{padding:16px 14px 90px}
+}
+
 </style>
 </head>
 <body>
@@ -391,6 +407,33 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     </main>
   </div>
 </div>
+
+<!-- MOBILE NAV -->
+<nav class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mn-item active" id="mn-btc" onclick="setTab('btc')">
+      <span class="mn-icon" style="color:var(--btc)">₿</span>
+      <span class="mn-label">Bitcoin</span>
+    </button>
+    <button class="mn-item" id="mn-eth" onclick="setTab('eth')">
+      <span class="mn-icon" style="color:var(--eth)">Ξ</span>
+      <span class="mn-label">Ethereum</span>
+    </button>
+    <button class="mn-item" id="mn-sol" onclick="setTab('sol')">
+      <span class="mn-icon" style="color:var(--sol)">◎</span>
+      <span class="mn-label">Solana</span>
+    </button>
+    <div class="mn-sep"></div>
+    <button class="mn-item" id="mn-w1" onclick="switchWallet(1)">
+      <span class="mn-icon">👤</span>
+      <span class="mn-label">Wallet 1</span>
+    </button>
+    <button class="mn-item" id="mn-w2" onclick="switchWallet(2)">
+      <span class="mn-icon">💎</span>
+      <span class="mn-label">Wallet 2</span>
+    </button>
+  </div>
+</nav>
 
 <!-- MODAL RÉCEPTION/ENVOI -->
 <div class="overlay" id="overlay-tx">
@@ -597,7 +640,13 @@ function switchWallet(w){
   document.getElementById("wsb1").classList.toggle("active",w===1);
   document.getElementById("wsb2").classList.toggle("active",w===2);
   document.querySelectorAll(".nav-item").forEach((el,i)=>el.classList.toggle("active",i===0));
-  render();
+  // mobile nav wallet buttons
+  const mnw1=document.getElementById("mn-w1");
+  const mnw2=document.getElementById("mn-w2");
+  if(mnw1){mnw1.classList.toggle("active",w===1);mnw1.classList.toggle("w2-active",false);}
+  if(mnw2){mnw2.classList.toggle("active",false);mnw2.classList.toggle("w2-active",w===2);}
+  // reset crypto tab highlight
+  setTab("btc");
 }
 
 // ── TOAST ──
@@ -624,6 +673,11 @@ function renderTabs(){
 function setTab(id){
   activeId=id;
   document.querySelectorAll(".nav-item").forEach((el,i)=>el.classList.toggle("active",ASSETS[i].id===id));
+  // mobile nav
+  ["btc","eth","sol"].forEach(s=>{
+    const el=document.getElementById("mn-"+s);
+    if(el){el.classList.toggle("active",s===id);el.classList.remove("w2-active");}
+  });
   render();
 }
 
